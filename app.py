@@ -12,14 +12,19 @@ from ddgs import DDGS
 # =========================
 # App Meta
 # =========================
-APP_VERSION = "v4.10"
+APP_VERSION = "v4.10.1"
 CREDIT_LINE = f"RealityBot {APP_VERSION} • gebaut für Dominik"
 
 
 # =========================
-# Streamlit Setup
+# Streamlit Setup  (FIX: Sidebar startet zu)
 # =========================
-st.set_page_config(page_title="RealityBot Deep-Dive", page_icon="🧠", layout="centered")
+st.set_page_config(
+    page_title="RealityBot Deep-Dive",
+    page_icon="🧠",
+    layout="centered",
+    initial_sidebar_state="collapsed",  # <- Mobile/UX Fix
+)
 
 
 # =========================
@@ -34,19 +39,34 @@ class SourceDoc:
 
 
 # =========================
-# CSS: Responsive (Mobile friendly)
+# CSS: Responsive (Mobile friendly) + Sidebar full-width on mobile
 # =========================
 def apply_global_css(sidebar_px_desktop: int = 460) -> None:
     st.markdown(
         f"""
 <style>
-/* Mobile padding + readable headings */
+/* Prevent horizontal scroll on mobile */
+html, body, [data-testid="stAppViewContainer"] {{
+  overflow-x: hidden !important;
+}}
+
+/* Mobile: make sidebar drawer full width */
 @media (max-width: 640px) {{
+  section[data-testid="stSidebar"] {{
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }}
+  section[data-testid="stSidebar"] > div {{
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }}
+
   .main .block-container {{
     padding-left: 1rem !important;
     padding-right: 1rem !important;
     padding-top: 1.25rem !important;
   }}
+
   h1 {{
     font-size: 1.85rem !important;
     line-height: 1.15 !important;
@@ -59,7 +79,7 @@ def apply_global_css(sidebar_px_desktop: int = 460) -> None:
   }}
 }}
 
-/* Sidebar width only on larger screens (desktop) */
+/* Desktop only: wider sidebar */
 @media (min-width: 1000px) {{
   section[data-testid="stSidebar"] {{
     width: {sidebar_px_desktop}px !important;
@@ -127,10 +147,11 @@ _INTERNAL_TAG_RE = re.compile(
     flags=re.IGNORECASE
 )
 
+
 def strip_internal_markers(text: str) -> str:
     text = _INTERNAL_TAG_RE.sub("", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
-    return text
+    return text.strip()
 
 
 # =========================
@@ -413,7 +434,8 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
     text = text.replace("**", "")
 
     sections = [
-        ("🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)", extract_section(text, "## 🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)")),
+        ("🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)",
+         extract_section(text, "## 🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)")),
         ("🔎 Chancen vs. Risiken (5 + 5)", extract_section(text, "## 🔎 Chancen vs. Risiken (5 + 5)")),
         ("🚨 Das Minenfeld", extract_section(text, "## 🚨 Das Minenfeld")),
         ("🧩 Maximale Essenz", extract_section(text, "## 🧩 Maximale Essenz")),
@@ -434,7 +456,6 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
     )
 
     story = []
-
     story.append(Paragraph(esc("RealityBot – Deep-Dive Dossier"), title_style))
     story.append(Spacer(1, 6))
     story.append(Paragraph(esc(topic), styles["Heading1"]))
@@ -446,7 +467,8 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
 
     toc_items = [name for name, content in sections if content]
     story.append(Spacer(1, 6))
-    story.append(ListFlowable([ListItem(Paragraph(esc(n), body)) for n in toc_items], bulletType="bullet", leftIndent=16))
+    story.append(ListFlowable([ListItem(Paragraph(esc(n), body)) for n in toc_items],
+                              bulletType="bullet", leftIndent=16))
     story.append(PageBreak())
 
     def render_block(block_title: str, content: str, is_warning: bool = False):
@@ -466,7 +488,8 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
         def flush_bullets():
             nonlocal bullets
             if bullets:
-                lf = ListFlowable([ListItem(Paragraph(esc(b), body)) for b in bullets], bulletType="bullet", leftIndent=16)
+                lf = ListFlowable([ListItem(Paragraph(esc(b), body)) for b in bullets],
+                                  bulletType="bullet", leftIndent=16)
                 story.append(lf)
                 story.append(Spacer(1, 6))
                 bullets = []
@@ -574,7 +597,11 @@ Er hängt an **deinem** Google-Konto (Limits/Kosten laufen darüber).
             fetch_top_n = st.slider("Top-Links fetchen", 0, 8, 4, 1)
             excerpt_chars = st.slider("Auszug-Länge", 300, 2000, 900, 100)
 
-        gemini_model = st.selectbox("Gemini Modell", ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"], index=0)
+        gemini_model = st.selectbox(
+            "Gemini Modell",
+            ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"],
+            index=0
+        )
         demo_mode = st.checkbox("Demo ohne KI", value=False)
 
 if "gemini_model" not in locals():
@@ -609,11 +636,10 @@ apply_blur_main_desktop_only(locked=not unlocked)
 # =========================
 st.title("🧠 RealityBot: Deep-Dive")
 
-# Mobile helper toggle (works even before unlock)
 st.session_state["mobile_layout"] = st.checkbox(
     "📱 Mobile-Ansicht (Tabs statt langer Seite)",
     value=st.session_state.get("mobile_layout", True),
-    help="Auf dem Handy sind Tabs oft angenehmer als eine sehr lange Scroll-Seite."
+    help="Auf dem Handy sind Tabs oft angenehmer als eine sehr lange Scroll-Seite.",
 )
 
 st.markdown(
@@ -643,7 +669,7 @@ if not unlocked:
 with st.form("topic_form", clear_on_submit=False):
     topic = st.text_input(
         "Was planst du zum ersten Mal?",
-        placeholder="z.B. erstes Mal Festivalcamping (alleine, Zelt, 3 Tage) / erste eigene Wohnung / …"
+        placeholder="z.B. erstes Mal Festivalcamping (alleine, Zelt, 3 Tage) / erste eigene Wohnung / …",
     )
     submitted = st.form_submit_button("Umfassende Analyse starten", use_container_width=True)
 
@@ -721,6 +747,7 @@ if submitted:
 def render_section(md: str, header: str) -> str:
     return extract_section(md, header) or ""
 
+
 if "final_report" in st.session_state:
     report_md = st.session_state.final_report
     topic_value = st.session_state.get("topic_value", "RealityBot Dossier")
@@ -779,14 +806,13 @@ if "final_report" in st.session_state:
         with st.expander("🔎 Quellenprüfung (Rohdaten) – gesammelt"):
             st.markdown(raw_sources_block)
 
-    # Downloads (mobile-friendly: full width buttons)
     export_txt = f"RealityBot – Deep-Dive Dossier\n\nTHEMA:\n{topic_value}\n\nREPORT:\n{report_md}\n"
     st.download_button(
         "📄 Dossier als .txt speichern",
         data=export_txt.encode("utf-8"),
         file_name=f"RealityBot_{re.sub(r'[^a-zA-Z0-9_-]+', '_', topic_value)[:40]}.txt",
         mime="text/plain",
-        use_container_width=True
+        use_container_width=True,
     )
 
     try:
@@ -796,7 +822,7 @@ if "final_report" in st.session_state:
             data=pdf_bytes,
             file_name=f"RealityBot_{re.sub(r'[^a-zA-Z0-9_-]+', '_', topic_value)[:40]}.pdf",
             mime="application/pdf",
-            use_container_width=True
+            use_container_width=True,
         )
     except Exception as e:
         st.warning(str(e))
