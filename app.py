@@ -12,18 +12,18 @@ from ddgs import DDGS
 # =========================
 # App Meta
 # =========================
-APP_VERSION = "v4.10.1"
+APP_VERSION = "v4.11"
 CREDIT_LINE = f"RealityBot {APP_VERSION} • gebaut für Dominik"
 
 
 # =========================
-# Streamlit Setup  (FIX: Sidebar startet zu)
+# Streamlit Setup (Mobile UX: Sidebar startet zu)
 # =========================
 st.set_page_config(
     page_title="RealityBot Deep-Dive",
     page_icon="🧠",
     layout="centered",
-    initial_sidebar_state="collapsed",  # <- Mobile/UX Fix
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -39,19 +39,20 @@ class SourceDoc:
 
 
 # =========================
-# CSS: Responsive (Mobile friendly) + Sidebar full-width on mobile
+# CSS: Responsive + WhatsApp/In-App Browser Fix
+# (Touch detection via pointer/hover instead of width)
 # =========================
 def apply_global_css(sidebar_px_desktop: int = 460) -> None:
     st.markdown(
         f"""
 <style>
-/* Prevent horizontal scroll on mobile */
+/* Kein seitliches Zerren / kein horizontaler Scroll */
 html, body, [data-testid="stAppViewContainer"] {{
   overflow-x: hidden !important;
 }}
 
-/* Mobile: make sidebar drawer full width */
-@media (max-width: 640px) {{
+/* ---------- MOBILE / TOUCH (unabhängig von gemeldeter Breite) ---------- */
+@media (pointer: coarse), (hover: none) {{
   section[data-testid="stSidebar"] {{
     width: 100vw !important;
     max-width: 100vw !important;
@@ -77,10 +78,16 @@ html, body, [data-testid="stAppViewContainer"] {{
   p, li {{
     font-size: 1.02rem !important;
   }}
+
+  /* Fingerfreundliche Buttons */
+  .stButton > button, .stDownloadButton > button {{
+    padding-top: 0.85rem !important;
+    padding-bottom: 0.85rem !important;
+  }}
 }}
 
-/* Desktop only: wider sidebar */
-@media (min-width: 1000px) {{
+/* ---------- DESKTOP (Maus/Trackpad) ---------- */
+@media (pointer: fine) and (min-width: 900px) {{
   section[data-testid="stSidebar"] {{
     width: {sidebar_px_desktop}px !important;
   }}
@@ -89,7 +96,7 @@ html, body, [data-testid="stAppViewContainer"] {{
   }}
 }}
 
-/* Slightly tighter sidebar text */
+/* Sidebar Text etwas luftiger */
 section[data-testid="stSidebar"] .stMarkdown p {{
   margin-bottom: 0.55rem;
 }}
@@ -100,12 +107,13 @@ section[data-testid="stSidebar"] .stMarkdown p {{
 
 
 def apply_blur_main_desktop_only(locked: bool) -> None:
-    # Blur only on desktop. On mobile: no blur (otherwise confusing).
+    # Blur nur auf echten Desktop-Geräten (pointer fine).
+    # Auf Touch (Handy/Tablet) niemals blurren -> wirkt sonst "verbuggt".
     if locked:
         st.markdown(
             """
 <style>
-@media (min-width: 1000px) {
+@media (pointer: fine) {
   section.main,
   div[data-testid="stMain"],
   div[data-testid="stMainBlockContainer"],
@@ -192,10 +200,12 @@ def fetch_page_text(url: str, timeout: int = 12, max_chars: int = 8000) -> str:
 
     html = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", html)
     text = re.sub(r"(?s)<.*?>", " ", html)
-    text = (text.replace("&nbsp;", " ")
-                .replace("&amp;", "&")
-                .replace("&quot;", '"')
-                .replace("&#39;", "'"))
+    text = (
+        text.replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+    )
     text = re.sub(r"\s+", " ", text).strip()
     if len(text) > max_chars:
         text = text[:max_chars] + "…"
@@ -537,8 +547,8 @@ with st.sidebar:
     st.markdown(
         """
 **API-Key (kurz & simpel):**  
-Ein **Zugangscode**, damit RealityBot bei Gemini die Analyse anfragen darf.  
-Er hängt an **deinem** Google-Konto (Limits/Kosten laufen darüber).  
+Ein **Zugangscode**, damit RealityBot die Analyse bei Gemini anfragen darf.  
+Er gehört zu **deinem** Google-Konto (Limits/Kosten laufen darüber).  
 👉 **Nicht teilen** – du kannst ihn jederzeit löschen.
 """
     )
@@ -613,7 +623,7 @@ if "per_side" not in locals():
 
 
 # =========================
-# Lock / Unlock main + blur desktop-only
+# Lock / Unlock main + blur only on desktop
 # =========================
 key_ok = (st.session_state.get("key_status") is not None and st.session_state["key_status"][0] == "ok")
 unlocked = demo_mode or key_ok
@@ -636,6 +646,7 @@ apply_blur_main_desktop_only(locked=not unlocked)
 # =========================
 st.title("🧠 RealityBot: Deep-Dive")
 
+# Mobile default: Tabs ON (weil Handy-Tests)
 st.session_state["mobile_layout"] = st.checkbox(
     "📱 Mobile-Ansicht (Tabs statt langer Seite)",
     value=st.session_state.get("mobile_layout", True),
