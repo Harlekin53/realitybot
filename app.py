@@ -12,9 +12,8 @@ from ddgs import DDGS
 # =========================
 # App Meta
 # =========================
-APP_VERSION = "v4.20"
+APP_VERSION = "v4.21"
 CREDIT_LINE = f"RealityBot {APP_VERSION} • gebaut von Dominik"
-
 
 # =========================
 # Streamlit Setup
@@ -23,7 +22,8 @@ st.set_page_config(
     page_title="RealityBot Deep-Dive",
     page_icon="🧠",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    # WICHTIG: Fokus auf Sidebar => auf Desktop direkt offen
+    initial_sidebar_state="expanded",
 )
 
 
@@ -39,7 +39,7 @@ class SourceDoc:
 
 
 # =========================
-# CSS: Responsive + In-App Browser Fix
+# CSS: Responsive + Sidebar Width + Mobile In-App Browser Fix
 # =========================
 def apply_global_css(sidebar_px_desktop: int = 460) -> None:
     st.markdown(
@@ -89,50 +89,21 @@ html, body, [data-testid="stAppViewContainer"] {{
 section[data-testid="stSidebar"] .stMarkdown p {{
   margin-bottom: 0.55rem;
 }}
+
+/* Kleine Kartenoptik (Lock Screen) */
+.rb-card {{
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 14px;
+  padding: 18px 18px;
+  background: rgba(20, 22, 28, 0.55);
+}}
+.rb-card h2 {{
+  margin-top: 0;
+}}
 </style>
         """,
         unsafe_allow_html=True,
     )
-
-
-def apply_blur_main_desktop_only(locked: bool) -> None:
-    # Blur nur auf Desktop (pointer fine). Auf Handy NIE blurren.
-    if locked:
-        st.markdown(
-            """
-<style>
-@media (pointer: fine) {
-  section.main,
-  div[data-testid="stMain"],
-  div[data-testid="stMainBlockContainer"],
-  div[data-testid="stAppViewContainer"] section.main {
-    filter: blur(4px);
-    opacity: 0.16;
-    pointer-events: none;
-    user-select: none;
-  }
-}
-</style>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            """
-<style>
-section.main,
-div[data-testid="stMain"],
-div[data-testid="stMainBlockContainer"],
-div[data-testid="stAppViewContainer"] section.main {
-  filter: none !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  user-select: auto !important;
-}
-</style>
-            """,
-            unsafe_allow_html=True,
-        )
 
 
 # =========================
@@ -242,7 +213,6 @@ def build_prompt(topic: str, pos_docs: List[SourceDoc], neg_docs: List[SourceDoc
     pos_block = format_sources_block("POSITIVE QUELLEN (Tipps/Chancen)", pos_docs)
     neg_block = format_sources_block("NEGATIVE QUELLEN (Reibung/Probleme)", neg_docs)
 
-    # Wichtig: Monolog eines erfahrenen Freundes, aber nicht künstlich.
     return f"""
 Du bist RealityBot.
 Du schreibst ein NAHBAR-DOSSIER aus Web-Quellen – so, dass es sich anfühlt, als hätte man das „erste Mal“ schon einmal im Kopf durchlebt.
@@ -317,7 +287,7 @@ Nummerierte Liste: Titel + URL. Nur Quellen aus den Blöcken oben.
 # =========================
 # Gemini Call
 # =========================
-def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 75) -> str:
+def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 85) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     res = requests.post(url, json=payload, timeout=timeout)
@@ -522,7 +492,6 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
         flush_bullets()
         story.append(Spacer(1, 6))
 
-    # Neue Reihenfolge: Essenz -> Briefing -> Chancen/Risiken -> Minenfeld -> Upside -> Checkliste -> Quellen
     render_block("🧩 Maximale Essenz", blocks.get("ESSENZ", ""))
     render_block("🧭 Wie es sich wirklich anfühlt", blocks.get("BRIEFING", ""))
     render_block("🔎 Chancen vs. Risiken", blocks.get("CHANCES_RISKS", ""))
@@ -538,32 +507,23 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
 
 
 # =========================
-# Profile: Tiefe der Suche (Main UI)
+# Profile: Search Depth
 # =========================
 def profile_from_depth(depth: str) -> Tuple[int, int, int, bool]:
-    """
-    returns:
-      per_side, fetch_top_n, excerpt_chars, fetch_enabled
-    """
     if depth == "Standard":
         return 5, 2, 650, True
     if depth == "Deep":
         return 8, 5, 1100, True
-    # Ultra
     return 10, 7, 1500, True
 
 
 def auto_deepen_if_too_thin(
-    topic_value: str,
     retries: int,
     backoff: float,
     base_per_side: int,
     neg_query: str,
     pos_query: str
 ) -> Tuple[List[SourceDoc], List[SourceDoc], int]:
-    """
-    Auto-Deepening: 5 → 8 → 10, wenn zu wenig brauchbare Quellen.
-    """
     for per_side in [base_per_side, 8, 10]:
         per_side = max(per_side, base_per_side)
 
@@ -575,7 +535,6 @@ def auto_deepen_if_too_thin(
         pos_docs = normalize_results(pos_raw)
 
         total_docs = len(neg_docs) + len(pos_docs)
-        # Schwelle: mindestens 6 URLs, sonst wird's zu dünn
         if total_docs >= 6:
             return pos_docs, neg_docs, per_side
 
@@ -626,8 +585,8 @@ Er hängt an **deinem** Google-Konto (Limits/Kosten laufen darüber).
     st.markdown(
         """
 **🔐 Datenschutz & Praxis-Tipp**  
-- Dein Key wird **nicht gespeichert** (nur in dieser laufenden Session genutzt).  
-- Je konkreter dein Thema, desto besser der Deep-Dive:
+- Dein Key wird **nicht gespeichert** (nur in dieser Session genutzt).  
+- Je konkreter dein Thema, desto besser:
   *„Erstes Mal Festivalcamping (alleine, 3 Tage, Zelt)“* > *„Festival“*.
 """
     )
@@ -646,9 +605,7 @@ Er hängt an **deinem** Google-Konto (Limits/Kosten laufen darüber).
             ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"],
             index=0
         )
-
         demo_mode = st.checkbox("Demo ohne KI", value=False)
-
 
 # Defaults if expander never opened
 if "gemini_model" not in locals():
@@ -666,14 +623,10 @@ if "fetch_top_n" not in locals():
 if "excerpt_chars" not in locals():
     excerpt_chars = 650
 
-
-# =========================
-# Unlock logic
-# =========================
 key_ok = (st.session_state.get("key_status") is not None and st.session_state["key_status"][0] == "ok")
 unlocked = demo_mode or key_ok
 
-# === Mobile: Sidebar automatisch "schließen" (via CSS ausblenden), sobald freigeschaltet ===
+# Mobile Sidebar auto-hide after unlock
 if "rb_hide_sidebar_mobile" not in st.session_state:
     st.session_state["rb_hide_sidebar_mobile"] = False
 
@@ -694,14 +647,30 @@ if st.session_state.get("rb_hide_sidebar_mobile", False):
         unsafe_allow_html=True
     )
 
-apply_blur_main_desktop_only(locked=not unlocked)
-
 
 # =========================
-# Main UI
+# LOCK SCREEN (Desktop fix)
 # =========================
 st.title("🧠 RealityBot: Deep-Dive")
 
+if not unlocked:
+    st.markdown(
+        """
+<div class="rb-card">
+  <h2>🔒 Erst aktivieren</h2>
+  <p>Füge links in der Sidebar deinen <b>Gemini API-Key</b> ein. Sobald er gültig ist, wird die Hauptseite freigeschaltet.</p>
+  <p style="opacity:0.85;">Tipp: Den Key bekommst du in Google AI Studio → „Create API key“.</p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption(CREDIT_LINE)
+    st.stop()
+
+
+# =========================
+# MAIN UI
+# =========================
 st.markdown(
     """
 RealityBot ist kein „frag die KI“-Tool.  
@@ -710,22 +679,15 @@ dass du den Kontext fühlst, nicht nur eine oberflächliche Erklärung bekommst.
 """
 )
 
-# If locked
-if not unlocked:
-    st.error("🔒 Erst aktivieren: Tippe oben links auf **☰**, öffne die Sidebar und füge deinen **Gemini API-Key** ein.")
-    st.caption(CREDIT_LINE)
-    st.stop()
-
-# Mobile helper: reopen settings (unhide sidebar)
+# Settings re-open (mobile)
 with st.expander("⚙️ Einstellungen (Key/Pro-Tools)", expanded=False):
-    st.write("Wenn du den Key ändern oder die Pro-Tools nutzen willst:")
+    st.write("Wenn du den Key ändern oder Pro-Tools nutzen willst:")
     if st.button("Sidebar wieder anzeigen", use_container_width=True):
         st.session_state["rb_hide_sidebar_mobile"] = False
         st.rerun()
     st.info("Auf dem Handy dann links oben **☰** tippen, um die Sidebar zu öffnen.")
 
-
-# Mobile layout default ON
+# Mobile layout toggle
 if "mobile_layout" not in st.session_state:
     st.session_state["mobile_layout"] = True
 
@@ -735,7 +697,6 @@ st.session_state["mobile_layout"] = st.checkbox(
     help="Auf dem Handy sind Tabs oft angenehmer als eine sehr lange Scroll-Seite.",
 )
 
-# NEW: Search depth in MAIN FIELD (instead of hidden only in sidebar)
 depth = st.selectbox(
     "Tiefe der Suche",
     ["Standard", "Deep", "Ultra"],
@@ -744,25 +705,65 @@ depth = st.selectbox(
 )
 base_per_side, prof_fetch_top_n, prof_excerpt_chars, prof_fetch_enabled = profile_from_depth(depth)
 
-# Profile overrides Pro-Tools defaults, aber Pro-Tools können feinjustieren
 effective_fetch_enabled = fetch_enabled and prof_fetch_enabled
 effective_fetch_top_n = max(fetch_top_n, prof_fetch_top_n) if effective_fetch_enabled else 0
 effective_excerpt_chars = max(excerpt_chars, prof_excerpt_chars)
 
 st.markdown(
     """
-**Tipp:** Gib ein Thema ein, bei dem du **wirklich** dein „erstes Mal“ vor dir hast.  
-RealityBot vergleicht echte Erfahrungen (Web) mit dem, was man sich vorher so vorstellt – und macht dich **praktisch** bereit.
+**Tipp:** Gib ein Thema ein, bei dem du wirklich dein „erstes Mal“ vor dir hast.  
+RealityBot vergleicht echte Erfahrungen (Web) mit dem, was man vorher denkt – und macht dich praktisch bereit.
 """
 )
 
 # =========================
-# Form: ENTER submits
+# HISTORY (Buttons)
+# =========================
+if "topic_input" not in st.session_state:
+    st.session_state["topic_input"] = ""
+if "topic_history" not in st.session_state:
+    st.session_state["topic_history"] = []
+if "pending_run_topic" not in st.session_state:
+    st.session_state["pending_run_topic"] = ""
+
+def add_to_history(t: str, limit: int = 10) -> None:
+    t = t.strip()
+    if not t:
+        return
+    hist = st.session_state["topic_history"]
+    # dedupe (move to front)
+    hist = [x for x in hist if x.strip().lower() != t.lower()]
+    hist.insert(0, t)
+    st.session_state["topic_history"] = hist[:limit]
+
+def render_history_buttons() -> None:
+    hist = st.session_state.get("topic_history", [])
+    if not hist:
+        return
+    st.markdown("**Letzte Themen (1 Tap = starten):**")
+    # 3 Buttons pro Reihe
+    for i in range(0, min(len(hist), 9), 3):
+        cols = st.columns(3)
+        for j in range(3):
+            idx = i + j
+            if idx >= len(hist) or idx >= 9:
+                continue
+            label = hist[idx]
+            if cols[j].button(label, use_container_width=True, key=f"hist_{idx}"):
+                st.session_state["topic_input"] = label
+                st.session_state["pending_run_topic"] = label
+                st.rerun()
+
+render_history_buttons()
+
+# =========================
+# FORM: ENTER submits
 # =========================
 with st.form("topic_form", clear_on_submit=False):
-    topic = st.text_input(
+    st.text_input(
         "Was planst du zum ersten Mal?",
-        placeholder="z.B. erstes Mal Festivalcamping (alleine, Zelt, 3 Tage) / erster Kuss / erste eigene Wohnung / …",
+        key="topic_input",
+        placeholder="z.B. erstes Mal Festivalcamping (alleine, Zelt, 3 Tage) / erste eigene Wohnung / …",
     )
     submitted = st.form_submit_button("Umfassende Analyse starten", use_container_width=True)
 
@@ -774,9 +775,9 @@ with colA:
 with colB:
     st.caption("💡 Tipp: Thema tippen + **Enter** drücken.")
 
-
 def run_analysis(topic_value: str) -> None:
-    if not topic_value.strip():
+    topic_value = (topic_value or "").strip()
+    if not topic_value:
         st.error("Bitte gib ein Thema ein.")
         return
 
@@ -788,7 +789,6 @@ def run_analysis(topic_value: str) -> None:
 
         try:
             pos_docs, neg_docs, used_per_side = auto_deepen_if_too_thin(
-                topic_value=topic_value,
                 retries=retries,
                 backoff=backoff,
                 base_per_side=base_per_side,
@@ -805,14 +805,13 @@ def run_analysis(topic_value: str) -> None:
             st.warning("Keine Treffer mit URLs gefunden. Tipp: Thema anders formulieren.")
             return
 
-        # Context fetching (optional)
         if effective_fetch_enabled and effective_fetch_top_n > 0:
             status.update(label="📚 Verdichte Kontext…", state="running")
             attach_excerpts(neg_docs, top_n=min(effective_fetch_top_n, len(neg_docs)), excerpt_chars=effective_excerpt_chars)
             attach_excerpts(pos_docs, top_n=min(effective_fetch_top_n, len(pos_docs)), excerpt_chars=effective_excerpt_chars)
 
         status.update(label="🧠 Schreibe Dossier…", state="running")
-        prompt = build_prompt(topic_value.strip(), pos_docs, neg_docs)
+        prompt = build_prompt(topic_value, pos_docs, neg_docs)
 
         try:
             report = call_gemini(prompt, api_key.strip(), gemini_model)
@@ -833,15 +832,20 @@ def run_analysis(topic_value: str) -> None:
 
         st.session_state.final_report = report
         st.session_state.raw_sources_block = raw_sources
-        st.session_state.topic_value = topic_value.strip()
+        st.session_state.topic_value = topic_value
         st.session_state.used_per_side = used_per_side
 
+        add_to_history(topic_value)
         status.update(label="✅ Dossier fertig.", state="complete")
 
+# Auto-run from history button
+if st.session_state.get("pending_run_topic"):
+    t = st.session_state["pending_run_topic"]
+    st.session_state["pending_run_topic"] = ""
+    run_analysis(t)
 
 if submitted:
-    run_analysis(topic)
-
+    run_analysis(st.session_state.get("topic_input", ""))
 
 # =========================
 # Output rendering
@@ -871,7 +875,6 @@ if "final_report" in st.session_state:
         st.warning("Hinweis: Die KI hat das Ausgabe-Format verändert. Ich zeige deshalb das komplette Dossier.")
         st.markdown(report_md)
     else:
-        # Neue Reihenfolge: Essenz -> Briefing -> Chancen/Risiken -> Minenfeld -> Upside -> Checkliste -> Quellen
         if st.session_state.get("mobile_layout", True):
             tabs = st.tabs([
                 "🧩 Essenz",
