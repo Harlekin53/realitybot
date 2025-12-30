@@ -12,8 +12,8 @@ from ddgs import DDGS
 # =========================
 # App Meta
 # =========================
-APP_VERSION = "v4.13"
-CREDIT_LINE = f"RealityBot {APP_VERSION} • gebaut für Dominik"
+APP_VERSION = "v4.20"
+CREDIT_LINE = f"RealityBot {APP_VERSION} • gebaut von Dominik"
 
 
 # =========================
@@ -39,7 +39,7 @@ class SourceDoc:
 
 
 # =========================
-# CSS: Responsive + WhatsApp/In-App Browser Fix
+# CSS: Responsive + In-App Browser Fix
 # =========================
 def apply_global_css(sidebar_px_desktop: int = 460) -> None:
     st.markdown(
@@ -150,10 +150,9 @@ def strip_internal_markers(text: str) -> str:
 
 
 # =========================
-# Robust parsing: RB markers (fixes "nicht gefunden")
+# Robust parsing: RB markers
 # =========================
 def extract_rb_block(md: str, name: str) -> str:
-    # [[RB:NAME]] ... [[/RB:NAME]]
     pattern = rf"(?s)\[\[RB:{re.escape(name)}\]\]\s*(.*?)\s*\[\[/RB:{re.escape(name)}\]\]"
     m = re.search(pattern, md)
     return m.group(1).strip() if m else ""
@@ -243,13 +242,17 @@ def build_prompt(topic: str, pos_docs: List[SourceDoc], neg_docs: List[SourceDoc
     pos_block = format_sources_block("POSITIVE QUELLEN (Tipps/Chancen)", pos_docs)
     neg_block = format_sources_block("NEGATIVE QUELLEN (Reibung/Probleme)", neg_docs)
 
+    # Wichtig: Monolog eines erfahrenen Freundes, aber nicht künstlich.
     return f"""
-Du bist RealityBot. Du baust ein NAHBAR-DOSSIER aus Web-Quellen.
-Ton: alltagstauglich, direkt, warm, realistisch (nicht wissenschaftlich, nicht literarisch).
-Ziel: Es soll sich anfühlen, als hätte die Person „{topic}“ gedanklich schon einmal durchlebt.
+Du bist RealityBot.
+Du schreibst ein NAHBAR-DOSSIER aus Web-Quellen – so, dass es sich anfühlt, als hätte man das „erste Mal“ schon einmal im Kopf durchlebt.
 
-ABSOLUT WICHTIG:
-- KEINE internen Marker wie [1 pos 4 neg], KEIN Quellen-Scoring, KEINE Meta-Auswertungen im Text.
+STIL (ganz wichtig):
+- Stimme: **Ich** bin ein sehr erfahrener Freund. Ich erzähle dir direkt, wie es wirklich läuft.
+- Ich rede dich mit **du** an. (Monolog, nahbar, ehrlich.)
+- Nicht wissenschaftlich. Nicht literarisch. Kein „Buch“. Keine Poesie.
+- Konkrete Momente, typische Situationen, echte Stolperer – aber kurz und präzise.
+- KEINE internen Marker wie [1 pos 4 neg], KEIN Quellen-Scoring, KEIN Meta-Gerede.
 
 THEMA: {topic}
 
@@ -258,50 +261,48 @@ WEB-QUELLEN:
 
 {neg_block}
 
-REGELN:
-- Schreibe in 2. Person („du“).
-- Paraphrasiere, keine langen Zitate.
-- Wenn etwas nicht aus Quellen ableitbar ist: **Annahme** markieren.
-- Die **Essenz** darf NICHT die Bulletpoints aus den anderen Abschnitten wiederholen.
-  Sie soll das Erlebnis verdichten, ohne aufgeblasen zu wirken.
-
 WICHTIG FÜR TECHNIK/PARSING:
 - Gib die Abschnitte GENAU in diesem Marker-Format aus.
-- KEINE zusätzlichen Marker, keine Änderungen an den Marker-Namen.
+- KEINE Änderungen an Marker-Namen.
 
 AUSGABE-FORMAT (genau so):
 
+[[RB:ESSENZ]]
+Fließtext. **Mindestens 500 Wörter.**
+KEINE Bulletpoints.
+Das ist der Teil, der „Realismus trifft Gefühl“ liefert:
+- 4–6 „Das passiert fast immer“-Momente (konkret, nicht dramatisch)
+- 3–4 „Wenn du X merkst, mach Y“-Abkürzungen
+- 2–3 typische Gedanken („du denkst kurz…“) – kurz, nicht romanartig
+Regel: Nicht aufblasen. Lieber dicht & klar als lang & schön.
+
+QUALITÄTSBREMSE:
+Wenn du merkst, du wirst zu „buchig“: kürze, werde konkreter, nimm Metaphern raus.
+[[/RB:ESSENZ]]
+
 [[RB:BRIEFING]]
-10–16 Bulletpoints mit hoher Erfahrungsdichte. (Nur Bulletpoints)
+10–16 Bulletpoints: „Ich sag dir kurz, wie es sich wirklich anfühlt / wie es meistens abläuft.“
+Nur Bulletpoints. Kurz, aber mit Erfahrungsdichte.
 [[/RB:BRIEFING]]
 
 [[RB:CHANCES_RISKS]]
-- 5 Chancen (Alltagssprache + kurzer Kontext)
-- 5 Risiken (Alltagssprache + kurzer Kontext)
+- 5 Chancen (alltagstauglich + warum das realistisch ist)
+- 5 Risiken (alltagstauglich + wie man sie entschärft)
 [[/RB:CHANCES_RISKS]]
 
 [[RB:MINEFIELD]]
-6–10 Bulletpoints: „das kann dir passieren“. Klar, konkret.
+6–10 Bulletpoints: „Das kann dir passieren“ (Stolperfallen, Stresspunkte, Peinlichkeiten, typische Fehler).
+Sehr konkret.
 [[/RB:MINEFIELD]]
 
-[[RB:ESSENZ]]
-KEINE Bulletpoints. Fließtext. Keine Wiederholung der Listen oben.
-Stil: nahbar, direkt, realistisch. Keine Poesie, keine Roman-Sprache.
-Kurze Absätze (meist 1–3 Sätze). Keine langen Satzketten.
-Länge: ca. 500–900 Wörter (lieber dichter als länger).
-Inhalt MUSS rein:
-- 3–5 „Das passiert fast immer“-Momente (konkret)
-- 2–3 „Wenn du X merkst, mach Y“-Sätze (Abkürzungen)
-- 2–3 typische Gedanken („du denkst kurz…“) – kurz, nicht dramatisch
-Wenn etwas nicht aus Quellen ableitbar ist: **Annahme** markieren.
-
-QUALITÄTSBREMSE:
-Wenn du zu blumig/„buchig“ wirst: kürze, werde konkreter, nimm Metaphern raus.
-[[/RB:ESSENZ]]
+[[RB:UPSIDE]]
+6–10 Bulletpoints: „Was dir das POSITIV bringen kann“ – auch wenn’s anstrengend ist.
+Beispiele: Wachstum, Sicherheit, Selbstvertrauen, bessere Entscheidungen, Aha-Momente.
+[[/RB:UPSIDE]]
 
 [[RB:CHECKLIST]]
 Checkboxen (- [ ]) passend zum Thema.
-12–20 Checkboxen, nutze nur passende Blöcke:
+12–22 Checkboxen, nutze nur passende Blöcke:
 - 🛒 Einkauf / Tools (falls relevant)
 - 📅 Erste 7 Tage (falls relevant)
 - 🧠 Mentale Hygiene (falls relevant)
@@ -316,7 +317,7 @@ Nummerierte Liste: Titel + URL. Nur Quellen aus den Blöcken oben.
 # =========================
 # Gemini Call
 # =========================
-def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 60) -> str:
+def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 75) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     res = requests.post(url, json=payload, timeout=timeout)
@@ -427,6 +428,7 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
     body = ParagraphStyle("RBBody", parent=styles["BodyText"], leading=14, spaceAfter=6)
     small = ParagraphStyle("RBSmall", parent=styles["BodyText"], fontSize=9, leading=11, textColor="#666666")
     warn = ParagraphStyle("RBWarn", parent=body, backColor="#3b0f12", borderPadding=8, spaceBefore=6, spaceAfter=6)
+    good = ParagraphStyle("RBGood", parent=body, backColor="#10341c", borderPadding=8, spaceBefore=6, spaceAfter=6)
 
     buf = BytesIO()
     doc = SimpleDocTemplate(
@@ -449,10 +451,11 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
     story.append(Spacer(1, 18))
 
     toc = [
+        ("🧩 Maximale Essenz", blocks.get("ESSENZ", "")),
         ("🧭 Wie es sich wirklich anfühlt", blocks.get("BRIEFING", "")),
         ("🔎 Chancen vs. Risiken", blocks.get("CHANCES_RISKS", "")),
         ("🚨 Das Minenfeld", blocks.get("MINEFIELD", "")),
-        ("🧩 Maximale Essenz", blocks.get("ESSENZ", "")),
+        ("🌱 Das Positive daran", blocks.get("UPSIDE", "")),
         ("✅ Praxis-Checkliste", blocks.get("CHECKLIST", "")),
         ("🌐 Quellen", blocks.get("SOURCES", "")),
     ]
@@ -465,7 +468,7 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
     ))
     story.append(PageBreak())
 
-    def render_block(title: str, content: str, is_warning: bool = False):
+    def render_block(title: str, content: str, mode: str = "normal"):
         story.append(Paragraph(esc(title), h2))
         lines = [ln.rstrip() for ln in (content or "").splitlines()]
         bullets = []
@@ -476,7 +479,12 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
             if paras:
                 p = " ".join([p.strip() for p in paras]).strip()
                 if p:
-                    story.append(Paragraph(esc(p), warn if is_warning else body))
+                    style = body
+                    if mode == "warn":
+                        style = warn
+                    elif mode == "good":
+                        style = good
+                    story.append(Paragraph(esc(p), style))
                 paras = []
 
         def flush_bullets():
@@ -514,10 +522,12 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
         flush_bullets()
         story.append(Spacer(1, 6))
 
+    # Neue Reihenfolge: Essenz -> Briefing -> Chancen/Risiken -> Minenfeld -> Upside -> Checkliste -> Quellen
+    render_block("🧩 Maximale Essenz", blocks.get("ESSENZ", ""))
     render_block("🧭 Wie es sich wirklich anfühlt", blocks.get("BRIEFING", ""))
     render_block("🔎 Chancen vs. Risiken", blocks.get("CHANCES_RISKS", ""))
-    render_block("🚨 Das Minenfeld", blocks.get("MINEFIELD", ""), is_warning=True)
-    render_block("🧩 Maximale Essenz", blocks.get("ESSENZ", ""))
+    render_block("🚨 Das Minenfeld", blocks.get("MINEFIELD", ""), mode="warn")
+    render_block("🌱 Das Positive daran", blocks.get("UPSIDE", ""), mode="good")
     render_block("✅ Praxis-Checkliste", blocks.get("CHECKLIST", ""))
     render_block("🌐 Quellen", blocks.get("SOURCES", ""))
 
@@ -525,6 +535,51 @@ def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
     story.append(Paragraph("— Ende des Dossiers —", small))
     doc.build(story)
     return buf.getvalue()
+
+
+# =========================
+# Profile: Tiefe der Suche (Main UI)
+# =========================
+def profile_from_depth(depth: str) -> Tuple[int, int, int, bool]:
+    """
+    returns:
+      per_side, fetch_top_n, excerpt_chars, fetch_enabled
+    """
+    if depth == "Standard":
+        return 5, 2, 650, True
+    if depth == "Deep":
+        return 8, 5, 1100, True
+    # Ultra
+    return 10, 7, 1500, True
+
+
+def auto_deepen_if_too_thin(
+    topic_value: str,
+    retries: int,
+    backoff: float,
+    base_per_side: int,
+    neg_query: str,
+    pos_query: str
+) -> Tuple[List[SourceDoc], List[SourceDoc], int]:
+    """
+    Auto-Deepening: 5 → 8 → 10, wenn zu wenig brauchbare Quellen.
+    """
+    for per_side in [base_per_side, 8, 10]:
+        per_side = max(per_side, base_per_side)
+
+        neg_raw = safe_ddgs_search(neg_query, max_results=per_side, retries=retries, backoff=backoff)
+        time.sleep(0.25)
+        pos_raw = safe_ddgs_search(pos_query, max_results=per_side, retries=retries, backoff=backoff)
+
+        neg_docs = normalize_results(neg_raw)
+        pos_docs = normalize_results(pos_raw)
+
+        total_docs = len(neg_docs) + len(pos_docs)
+        # Schwelle: mindestens 6 URLs, sonst wird's zu dünn
+        if total_docs >= 6:
+            return pos_docs, neg_docs, per_side
+
+    return pos_docs, neg_docs, per_side
 
 
 # =========================
@@ -579,25 +634,12 @@ Er hängt an **deinem** Google-Konto (Limits/Kosten laufen darüber).
 
     st.markdown("---")
     with st.expander("🧰 Pro-Tools (optional)", expanded=False):
-        # Standard etwas "schneller", damit Mobile nicht ewig lädt
-        preset = st.radio("Deep-Dive Profil", ["Standard", "Deep", "Ultra-Deep", "Manuell"], index=0)
+        retries = st.slider("Stabilität (Retries)", 1, 6, 3, 1)
+        backoff = st.slider("Backoff", 1.0, 3.0, 1.4, 0.1)
 
-        if preset == "Standard":
-            per_side, retries, backoff = 5, 3, 1.4
-            fetch_enabled, fetch_top_n, excerpt_chars = True, 2, 650
-        elif preset == "Deep":
-            per_side, retries, backoff = 8, 4, 1.6
-            fetch_enabled, fetch_top_n, excerpt_chars = True, 5, 1100
-        elif preset == "Ultra-Deep":
-            per_side, retries, backoff = 10, 5, 1.8
-            fetch_enabled, fetch_top_n, excerpt_chars = True, 7, 1500
-        else:
-            per_side = st.slider("Treffer je Seite", 3, 10, 5, 1)
-            retries = st.slider("Stabilität (Retries)", 1, 5, 3, 1)
-            backoff = st.slider("Backoff", 1.0, 3.0, 1.4, 0.1)
-            fetch_enabled = st.checkbox("Mehr Kontext (Seiten-Auszüge)", value=True)
-            fetch_top_n = st.slider("Top-Links fetchen", 0, 8, 2, 1)
-            excerpt_chars = st.slider("Auszug-Länge", 300, 2000, 650, 100)
+        fetch_enabled = st.checkbox("Mehr Kontext (Seiten-Auszüge)", value=True)
+        fetch_top_n = st.slider("Top-Links fetchen", 0, 8, 2, 1)
+        excerpt_chars = st.slider("Auszug-Länge", 300, 2000, 650, 100)
 
         gemini_model = st.selectbox(
             "Gemini Modell",
@@ -613,9 +655,16 @@ if "gemini_model" not in locals():
     gemini_model = "gemini-2.5-flash"
 if "demo_mode" not in locals():
     demo_mode = False
-if "per_side" not in locals():
-    per_side, retries, backoff = 5, 3, 1.4
-    fetch_enabled, fetch_top_n, excerpt_chars = True, 2, 650
+if "retries" not in locals():
+    retries = 3
+if "backoff" not in locals():
+    backoff = 1.4
+if "fetch_enabled" not in locals():
+    fetch_enabled = True
+if "fetch_top_n" not in locals():
+    fetch_top_n = 2
+if "excerpt_chars" not in locals():
+    excerpt_chars = 650
 
 
 # =========================
@@ -628,12 +677,10 @@ unlocked = demo_mode or key_ok
 if "rb_hide_sidebar_mobile" not in st.session_state:
     st.session_state["rb_hide_sidebar_mobile"] = False
 
-# Sobald unlocked zum ersten Mal True ist, Sidebar auf Mobile automatisch ausblenden
 if unlocked and not st.session_state["rb_hide_sidebar_mobile"]:
     st.session_state["rb_hide_sidebar_mobile"] = True
     st.rerun()
 
-# CSS hide (Mobile only)
 if st.session_state.get("rb_hide_sidebar_mobile", False):
     st.markdown(
         """
@@ -647,7 +694,6 @@ if st.session_state.get("rb_hide_sidebar_mobile", False):
         unsafe_allow_html=True
     )
 
-# Blur on desktop only while locked
 apply_blur_main_desktop_only(locked=not unlocked)
 
 
@@ -661,13 +707,6 @@ st.markdown(
 RealityBot ist kein „frag die KI“-Tool.  
 Er sammelt im Hintergrund echte Web-Erfahrungen – **Tipps UND Schattenseiten** – und verdichtet das so,
 dass du den Kontext fühlst, nicht nur eine oberflächliche Erklärung bekommst.
-
-Du bekommst:
-- **Erfahrungs-Briefing**
-- **Chancen + Risiken**
-- **Minenfeld**
-- **Maximale Essenz**
-- **Praxis-Checkliste**
 """
 )
 
@@ -685,7 +724,8 @@ with st.expander("⚙️ Einstellungen (Key/Pro-Tools)", expanded=False):
         st.rerun()
     st.info("Auf dem Handy dann links oben **☰** tippen, um die Sidebar zu öffnen.")
 
-# Default mobile layout ON, without forcing users to understand it
+
+# Mobile layout default ON
 if "mobile_layout" not in st.session_state:
     st.session_state["mobile_layout"] = True
 
@@ -695,6 +735,26 @@ st.session_state["mobile_layout"] = st.checkbox(
     help="Auf dem Handy sind Tabs oft angenehmer als eine sehr lange Scroll-Seite.",
 )
 
+# NEW: Search depth in MAIN FIELD (instead of hidden only in sidebar)
+depth = st.selectbox(
+    "Tiefe der Suche",
+    ["Standard", "Deep", "Ultra"],
+    index=0,
+    help="Je tiefer, desto mehr Quellen & Kontext (dauert etwas länger)."
+)
+base_per_side, prof_fetch_top_n, prof_excerpt_chars, prof_fetch_enabled = profile_from_depth(depth)
+
+# Profile overrides Pro-Tools defaults, aber Pro-Tools können feinjustieren
+effective_fetch_enabled = fetch_enabled and prof_fetch_enabled
+effective_fetch_top_n = max(fetch_top_n, prof_fetch_top_n) if effective_fetch_enabled else 0
+effective_excerpt_chars = max(excerpt_chars, prof_excerpt_chars)
+
+st.markdown(
+    """
+**Tipp:** Gib ein Thema ein, bei dem du **wirklich** dein „erstes Mal“ vor dir hast.  
+RealityBot vergleicht echte Erfahrungen (Web) mit dem, was man sich vorher so vorstellt – und macht dich **praktisch** bereit.
+"""
+)
 
 # =========================
 # Form: ENTER submits
@@ -702,14 +762,14 @@ st.session_state["mobile_layout"] = st.checkbox(
 with st.form("topic_form", clear_on_submit=False):
     topic = st.text_input(
         "Was planst du zum ersten Mal?",
-        placeholder="z.B. erstes Mal Festivalcamping (alleine, Zelt, 3 Tage) / erste eigene Wohnung / …",
+        placeholder="z.B. erstes Mal Festivalcamping (alleine, Zelt, 3 Tage) / erster Kuss / erste eigene Wohnung / …",
     )
     submitted = st.form_submit_button("Umfassende Analyse starten", use_container_width=True)
 
 colA, colB = st.columns([1, 1])
 with colA:
     if st.button("🧹 Ergebnis zurücksetzen", use_container_width=True):
-        for k in ["final_report", "raw_sources_block", "topic_value"]:
+        for k in ["final_report", "raw_sources_block", "topic_value", "used_per_side"]:
             st.session_state.pop(k, None)
 with colB:
     st.caption("💡 Tipp: Thema tippen + **Enter** drücken.")
@@ -727,26 +787,29 @@ def run_analysis(topic_value: str) -> None:
         status.update(label="🛰️ Sammle Erfahrungswissen…", state="running")
 
         try:
-            neg_raw = safe_ddgs_search(neg_query, max_results=per_side, retries=retries, backoff=backoff)
-            time.sleep(0.35)
-            pos_raw = safe_ddgs_search(pos_query, max_results=per_side, retries=retries, backoff=backoff)
+            pos_docs, neg_docs, used_per_side = auto_deepen_if_too_thin(
+                topic_value=topic_value,
+                retries=retries,
+                backoff=backoff,
+                base_per_side=base_per_side,
+                neg_query=neg_query,
+                pos_query=pos_query
+            )
         except Exception as e:
             status.update(label="⚠️ Recherche konnte nicht abgeschlossen werden", state="error")
             st.error(f"Recherche-Fehler: {e}")
             return
 
-        neg_docs = normalize_results(neg_raw)
-        pos_docs = normalize_results(pos_raw)
-
-        if not neg_docs and not pos_docs:
+        if not pos_docs and not neg_docs:
             status.update(label="⚠️ Keine brauchbaren Quellen gefunden", state="error")
             st.warning("Keine Treffer mit URLs gefunden. Tipp: Thema anders formulieren.")
             return
 
-        if fetch_enabled and fetch_top_n > 0:
+        # Context fetching (optional)
+        if effective_fetch_enabled and effective_fetch_top_n > 0:
             status.update(label="📚 Verdichte Kontext…", state="running")
-            attach_excerpts(neg_docs, top_n=min(fetch_top_n, len(neg_docs)), excerpt_chars=excerpt_chars)
-            attach_excerpts(pos_docs, top_n=min(fetch_top_n, len(pos_docs)), excerpt_chars=excerpt_chars)
+            attach_excerpts(neg_docs, top_n=min(effective_fetch_top_n, len(neg_docs)), excerpt_chars=effective_excerpt_chars)
+            attach_excerpts(pos_docs, top_n=min(effective_fetch_top_n, len(pos_docs)), excerpt_chars=effective_excerpt_chars)
 
         status.update(label="🧠 Schreibe Dossier…", state="running")
         prompt = build_prompt(topic_value.strip(), pos_docs, neg_docs)
@@ -754,7 +817,11 @@ def run_analysis(topic_value: str) -> None:
         try:
             report = call_gemini(prompt, api_key.strip(), gemini_model)
         except Exception as e:
-            report = f"[[RB:BRIEFING]]\n⚠️ KI-Analyse fehlgeschlagen: {str(e)}\n[[/RB:BRIEFING]]"
+            report = (
+                "[[RB:ESSENZ]]\n"
+                f"⚠️ KI-Analyse fehlgeschlagen: {str(e)}\n"
+                "[[/RB:ESSENZ]]\n"
+            )
 
         report = strip_internal_markers(report)
 
@@ -767,6 +834,7 @@ def run_analysis(topic_value: str) -> None:
         st.session_state.final_report = report
         st.session_state.raw_sources_block = raw_sources
         st.session_state.topic_value = topic_value.strip()
+        st.session_state.used_per_side = used_per_side
 
         status.update(label="✅ Dossier fertig.", state="complete")
 
@@ -782,49 +850,68 @@ if "final_report" in st.session_state:
     report_md = st.session_state.final_report
     topic_value = st.session_state.get("topic_value", "RealityBot Dossier")
     raw_sources_block = st.session_state.get("raw_sources_block", "")
+    used_per_side = st.session_state.get("used_per_side", base_per_side)
 
     blocks = {
+        "ESSENZ": extract_rb_block(report_md, "ESSENZ"),
         "BRIEFING": extract_rb_block(report_md, "BRIEFING"),
         "CHANCES_RISKS": extract_rb_block(report_md, "CHANCES_RISKS"),
         "MINEFIELD": extract_rb_block(report_md, "MINEFIELD"),
-        "ESSENZ": extract_rb_block(report_md, "ESSENZ"),
+        "UPSIDE": extract_rb_block(report_md, "UPSIDE"),
         "CHECKLIST": extract_rb_block(report_md, "CHECKLIST"),
         "SOURCES": extract_rb_block(report_md, "SOURCES"),
     }
 
-    # Fallback: wenn Marker fehlen (z.B. KI weicht ab), zeige komplett
     marker_missing = all(not v.strip() for v in blocks.values())
 
     st.divider()
+    st.caption(f"Recherche-Tiefe: {depth} • Treffer pro Seite genutzt: {used_per_side} (auto-deepen möglich)")
 
     if marker_missing:
-        st.warning("Hinweis: Die KI hat das Ausgabe-Format leicht verändert. Ich zeige deshalb das komplette Dossier.")
+        st.warning("Hinweis: Die KI hat das Ausgabe-Format verändert. Ich zeige deshalb das komplette Dossier.")
         st.markdown(report_md)
     else:
+        # Neue Reihenfolge: Essenz -> Briefing -> Chancen/Risiken -> Minenfeld -> Upside -> Checkliste -> Quellen
         if st.session_state.get("mobile_layout", True):
-            tabs = st.tabs(["🧭 Briefing", "🔎 5+5", "🚨 Minenfeld", "🧩 Essenz", "✅ Checkliste", "🌐 Quellen"])
+            tabs = st.tabs([
+                "🧩 Essenz",
+                "🧭 Briefing",
+                "🔎 Chancen & Risiken",
+                "🚨 Minenfeld",
+                "🌱 Positiver Effekt",
+                "✅ Checkliste",
+                "🌐 Quellen",
+            ])
             with tabs[0]:
-                st.markdown(blocks["BRIEFING"] or "_(nicht gefunden)_")
+                st.markdown(blocks["ESSENZ"] or "_(nicht gefunden)_")
             with tabs[1]:
-                st.markdown(blocks["CHANCES_RISKS"] or "_(nicht gefunden)_")
+                st.markdown(blocks["BRIEFING"] or "_(nicht gefunden)_")
             with tabs[2]:
+                st.markdown(blocks["CHANCES_RISKS"] or "_(nicht gefunden)_")
+            with tabs[3]:
                 if blocks["MINEFIELD"]:
                     st.error(blocks["MINEFIELD"])
                 else:
                     st.markdown("_(nicht gefunden)_")
-            with tabs[3]:
-                st.markdown(blocks["ESSENZ"] or "_(nicht gefunden)_")
             with tabs[4]:
-                st.markdown(blocks["CHECKLIST"] or "_(nicht gefunden)_")
+                if blocks["UPSIDE"]:
+                    st.success(blocks["UPSIDE"])
+                else:
+                    st.markdown("_(nicht gefunden)_")
             with tabs[5]:
+                st.markdown(blocks["CHECKLIST"] or "_(nicht gefunden)_")
+            with tabs[6]:
                 st.markdown(blocks["SOURCES"] or "_(nicht gefunden)_")
                 with st.expander("🔎 Quellenprüfung (Rohdaten) – gesammelt"):
                     st.markdown(raw_sources_block)
         else:
-            st.markdown("## 🧭 Wie es sich wirklich anfühlt")
+            st.markdown("## 🧩 Maximale Essenz")
+            st.markdown(blocks["ESSENZ"] or "_(nicht gefunden)_")
+
+            st.markdown("## 🧭 Wie es sich wirklich anfühlt (Briefing)")
             st.markdown(blocks["BRIEFING"] or "_(nicht gefunden)_")
 
-            st.markdown("## 🔎 Chancen vs. Risiken (5 + 5)")
+            st.markdown("## 🔎 Chancen & Risiken")
             st.markdown(blocks["CHANCES_RISKS"] or "_(nicht gefunden)_")
 
             st.markdown("## 🚨 Das Minenfeld")
@@ -833,8 +920,11 @@ if "final_report" in st.session_state:
             else:
                 st.markdown("_(nicht gefunden)_")
 
-            st.markdown("## 🧩 Maximale Essenz")
-            st.markdown(blocks["ESSENZ"] or "_(nicht gefunden)_")
+            st.markdown("## 🌱 Was dir das positiv bringen kann")
+            if blocks["UPSIDE"]:
+                st.success(blocks["UPSIDE"])
+            else:
+                st.markdown("_(nicht gefunden)_")
 
             st.markdown("## ✅ Praxis-Checkliste")
             st.markdown(blocks["CHECKLIST"] or "_(nicht gefunden)_")
@@ -860,7 +950,7 @@ if "final_report" in st.session_state:
     )
 
     try:
-        pdf_bytes = build_pdf_bytes_pretty(topic_value, blocks if not marker_missing else {"BRIEFING": report_md})
+        pdf_bytes = build_pdf_bytes_pretty(topic_value, blocks if not marker_missing else {"ESSENZ": report_md})
         st.download_button(
             "🧾 Dossier als PDF speichern",
             data=pdf_bytes,
