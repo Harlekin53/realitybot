@@ -12,12 +12,12 @@ from ddgs import DDGS
 # =========================
 # App Meta
 # =========================
-APP_VERSION = "v4.11"
+APP_VERSION = "v4.13"
 CREDIT_LINE = f"RealityBot {APP_VERSION} • gebaut für Dominik"
 
 
 # =========================
-# Streamlit Setup (Mobile UX: Sidebar startet zu)
+# Streamlit Setup
 # =========================
 st.set_page_config(
     page_title="RealityBot Deep-Dive",
@@ -40,18 +40,16 @@ class SourceDoc:
 
 # =========================
 # CSS: Responsive + WhatsApp/In-App Browser Fix
-# (Touch detection via pointer/hover instead of width)
 # =========================
 def apply_global_css(sidebar_px_desktop: int = 460) -> None:
     st.markdown(
         f"""
 <style>
-/* Kein seitliches Zerren / kein horizontaler Scroll */
 html, body, [data-testid="stAppViewContainer"] {{
   overflow-x: hidden !important;
 }}
 
-/* ---------- MOBILE / TOUCH (unabhängig von gemeldeter Breite) ---------- */
+/* MOBILE / TOUCH */
 @media (pointer: coarse), (hover: none) {{
   section[data-testid="stSidebar"] {{
     width: 100vw !important;
@@ -68,25 +66,17 @@ html, body, [data-testid="stAppViewContainer"] {{
     padding-top: 1.25rem !important;
   }}
 
-  h1 {{
-    font-size: 1.85rem !important;
-    line-height: 1.15 !important;
-  }}
-  h2 {{
-    font-size: 1.3rem !important;
-  }}
-  p, li {{
-    font-size: 1.02rem !important;
-  }}
+  h1 {{ font-size: 1.85rem !important; line-height: 1.15 !important; }}
+  h2 {{ font-size: 1.3rem !important; }}
+  p, li {{ font-size: 1.02rem !important; }}
 
-  /* Fingerfreundliche Buttons */
   .stButton > button, .stDownloadButton > button {{
     padding-top: 0.85rem !important;
     padding-bottom: 0.85rem !important;
   }}
 }}
 
-/* ---------- DESKTOP (Maus/Trackpad) ---------- */
+/* DESKTOP */
 @media (pointer: fine) and (min-width: 900px) {{
   section[data-testid="stSidebar"] {{
     width: {sidebar_px_desktop}px !important;
@@ -96,7 +86,6 @@ html, body, [data-testid="stAppViewContainer"] {{
   }}
 }}
 
-/* Sidebar Text etwas luftiger */
 section[data-testid="stSidebar"] .stMarkdown p {{
   margin-bottom: 0.55rem;
 }}
@@ -107,8 +96,7 @@ section[data-testid="stSidebar"] .stMarkdown p {{
 
 
 def apply_blur_main_desktop_only(locked: bool) -> None:
-    # Blur nur auf echten Desktop-Geräten (pointer fine).
-    # Auf Touch (Handy/Tablet) niemals blurren -> wirkt sonst "verbuggt".
+    # Blur nur auf Desktop (pointer fine). Auf Handy NIE blurren.
     if locked:
         st.markdown(
             """
@@ -155,11 +143,20 @@ _INTERNAL_TAG_RE = re.compile(
     flags=re.IGNORECASE
 )
 
-
 def strip_internal_markers(text: str) -> str:
     text = _INTERNAL_TAG_RE.sub("", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
     return text.strip()
+
+
+# =========================
+# Robust parsing: RB markers (fixes "nicht gefunden")
+# =========================
+def extract_rb_block(md: str, name: str) -> str:
+    # [[RB:NAME]] ... [[/RB:NAME]]
+    pattern = rf"(?s)\[\[RB:{re.escape(name)}\]\]\s*(.*?)\s*\[\[/RB:{re.escape(name)}\]\]"
+    m = re.search(pattern, md)
+    return m.group(1).strip() if m else ""
 
 
 # =========================
@@ -192,7 +189,7 @@ def normalize_results(results: List[Dict]) -> List[SourceDoc]:
 # Optional: Fetch page text (cached)
 # =========================
 @st.cache_data(ttl=3600)
-def fetch_page_text(url: str, timeout: int = 12, max_chars: int = 8000) -> str:
+def fetch_page_text(url: str, timeout: int = 12, max_chars: int = 7000) -> str:
     headers = {"User-Agent": "Mozilla/5.0 (RealityBot; Streamlit) AppleWebKit/537.36"}
     res = requests.get(url, headers=headers, timeout=timeout)
     res.raise_for_status()
@@ -227,7 +224,7 @@ def attach_excerpts(docs: List[SourceDoc], top_n: int, excerpt_chars: int) -> Li
 # =========================
 # Prompt helpers
 # =========================
-def format_sources_block(label: str, docs: List[SourceDoc], per_doc_limit: int = 1500) -> str:
+def format_sources_block(label: str, docs: List[SourceDoc], per_doc_limit: int = 1400) -> str:
     lines = [f"## {label}"]
     for i, d in enumerate(docs, 1):
         parts = [f"[{i}] {d.title}", f"URL: {d.url}"]
@@ -268,59 +265,58 @@ REGELN:
 - Die **Essenz** darf NICHT die Bulletpoints aus den anderen Abschnitten wiederholen.
   Sie soll das Erlebnis verdichten, ohne aufgeblasen zu wirken.
 
-LIEFERE GENAU DIESE STRUKTUR (mit exakt diesen Überschriften):
+WICHTIG FÜR TECHNIK/PARSING:
+- Gib die Abschnitte GENAU in diesem Marker-Format aus.
+- KEINE zusätzlichen Marker, keine Änderungen an den Marker-Namen.
 
-## 🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)
-10–16 Bulletpoints mit hoher Erfahrungsdichte.
+AUSGABE-FORMAT (genau so):
 
-## 🔎 Chancen vs. Risiken (5 + 5)
+[[RB:BRIEFING]]
+10–16 Bulletpoints mit hoher Erfahrungsdichte. (Nur Bulletpoints)
+[[/RB:BRIEFING]]
+
+[[RB:CHANCES_RISKS]]
 - 5 Chancen (Alltagssprache + kurzer Kontext)
 - 5 Risiken (Alltagssprache + kurzer Kontext)
+[[/RB:CHANCES_RISKS]]
 
-## 🚨 Das Minenfeld
+[[RB:MINEFIELD]]
 6–10 Bulletpoints: „das kann dir passieren“. Klar, konkret.
+[[/RB:MINEFIELD]]
 
-## 🧩 Maximale Essenz
-WICHTIG: Das ist KEINE Wiederholung der Listen oben.
-Schreibe ein „Realitäts-Recap“, als hätte jemand {topic} gerade wirklich gemacht und erzählt dir danach,
-was er/sie gerne vorher gewusst hätte.
+[[RB:ESSENZ]]
+KEINE Bulletpoints. Fließtext. Keine Wiederholung der Listen oben.
+Stil: nahbar, direkt, realistisch. Keine Poesie, keine Roman-Sprache.
+Kurze Absätze (meist 1–3 Sätze). Keine langen Satzketten.
+Länge: ca. 500–900 Wörter (lieber dichter als länger).
+Inhalt MUSS rein:
+- 3–5 „Das passiert fast immer“-Momente (konkret)
+- 2–3 „Wenn du X merkst, mach Y“-Sätze (Abkürzungen)
+- 2–3 typische Gedanken („du denkst kurz…“) – kurz, nicht dramatisch
+Wenn etwas nicht aus Quellen ableitbar ist: **Annahme** markieren.
 
-Stil-Regeln (bitte strikt):
-- Nahbar, direkt, realistisch. Keine Poesie, keine „Roman-Sprache“.
-- Kurze Absätze (meist 1–3 Sätze). Keine langen, kunstvollen Satzketten.
-- Mindestlänge: ca. 500–900 Wörter (lieber dichter als länger).
-- Fokus auf echte Momente: Timing, Unsicherheiten, typische Situationen, kleine Fehler, kleine Rettungen.
-- Keine Bulletpoints in der Essenz (Fließtext), aber gern 2–3 kurze Zwischenzeilen als Orientierung.
+QUALITÄTSBREMSE:
+Wenn du zu blumig/„buchig“ wirst: kürze, werde konkreter, nimm Metaphern raus.
+[[/RB:ESSENZ]]
 
-Inhaltlich MUSS rein:
-- 3–5 „Das passiert fast immer“-Momente (sehr konkret).
-- 2–3 „Wenn du X merkst, mach Y“-Sätze (wie echte Abkürzungen).
-- 2–3 typische Gedanken im Kopf („du denkst kurz…“) – kurz, nicht dramatisch.
-- Wenn etwas nicht aus Quellen ableitbar ist: **Annahme** markieren.
-
-QUALITÄTSBREMSE (wichtig):
-Wenn du merkst, du wirst zu blumig/„buchig“ oder zu langatmig:
-- kürze sofort,
-- werde konkreter,
-- nimm Metaphern raus,
-- schreibe so, wie man es einem Freund nach dem Erlebnis erzählen würde.
-
-## ✅ Praxis-Checkliste (dynamisch)
-Checkboxen (- [ ]) passend zum Thema. Nutze nur passende Blöcke:
+[[RB:CHECKLIST]]
+Checkboxen (- [ ]) passend zum Thema.
+12–20 Checkboxen, nutze nur passende Blöcke:
 - 🛒 Einkauf / Tools (falls relevant)
 - 📅 Erste 7 Tage (falls relevant)
 - 🧠 Mentale Hygiene (falls relevant)
-Insgesamt 12–20 Checkboxen.
+[[/RB:CHECKLIST]]
 
-## 🌐 Quellen
+[[RB:SOURCES]]
 Nummerierte Liste: Titel + URL. Nur Quellen aus den Blöcken oben.
+[[/RB:SOURCES]]
 """.strip()
 
 
 # =========================
 # Gemini Call
 # =========================
-def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 45) -> str:
+def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 60) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     res = requests.post(url, json=payload, timeout=timeout)
@@ -330,7 +326,7 @@ def call_gemini(prompt: str, api_key: str, model: str, timeout: int = 45) -> str
     try:
         return data["candidates"][0]["content"]["parts"][0]["text"]
     except Exception:
-        raise RuntimeError(f"Gemini Antwort unerwartet: {str(data)[:800]}")
+        raise RuntimeError(f"Gemini Antwort unerwartet: {str(data)[:900]}")
 
 
 # =========================
@@ -410,25 +406,20 @@ def key_validation_engine(api_key: str, debounce_s: float = 0.6) -> None:
 
 
 # =========================
-# Markdown parsing helpers
+# PDF export (pretty)
 # =========================
-def extract_section(md: str, header: str) -> Optional[str]:
-    pattern = rf"(?s){re.escape(header)}\s*(.*?)(?=\n##\s|\Z)"
-    m = re.search(pattern, md)
-    return m.group(1).strip() if m else None
-
-
-# =========================
-# PDF export: prettier dossier (cover + TOC + warning block)
-# =========================
-def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
+def build_pdf_bytes_pretty(topic: str, blocks: Dict[str, str]) -> bytes:
     try:
+        from io import BytesIO
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import cm
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     except Exception as e:
         raise RuntimeError("PDF-Export benötigt 'reportlab'. Installiere mit: pip install reportlab") from e
+
+    def esc(s: str) -> str:
+        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     styles = getSampleStyleSheet()
     title_style = styles["Title"]
@@ -437,23 +428,6 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
     small = ParagraphStyle("RBSmall", parent=styles["BodyText"], fontSize=9, leading=11, textColor="#666666")
     warn = ParagraphStyle("RBWarn", parent=body, backColor="#3b0f12", borderPadding=8, spaceBefore=6, spaceAfter=6)
 
-    def esc(s: str) -> str:
-        return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
-
-    text = md_text.replace("- [ ]", "☐").replace("- [x]", "☑").replace("- [X]", "☑")
-    text = text.replace("**", "")
-
-    sections = [
-        ("🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)",
-         extract_section(text, "## 🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)")),
-        ("🔎 Chancen vs. Risiken (5 + 5)", extract_section(text, "## 🔎 Chancen vs. Risiken (5 + 5)")),
-        ("🚨 Das Minenfeld", extract_section(text, "## 🚨 Das Minenfeld")),
-        ("🧩 Maximale Essenz", extract_section(text, "## 🧩 Maximale Essenz")),
-        ("✅ Praxis-Checkliste", extract_section(text, "## ✅ Praxis-Checkliste (dynamisch)")),
-        ("🌐 Quellen", extract_section(text, "## 🌐 Quellen")),
-    ]
-
-    from io import BytesIO
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -473,34 +447,46 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
     story.append(Paragraph(esc(CREDIT_LINE), small))
     story.append(Paragraph(esc(datetime.now().strftime("%d.%m.%Y • %H:%M")), small))
     story.append(Spacer(1, 18))
-    story.append(Paragraph(esc("Inhaltsübersicht"), styles["Heading3"]))
 
-    toc_items = [name for name, content in sections if content]
+    toc = [
+        ("🧭 Wie es sich wirklich anfühlt", blocks.get("BRIEFING", "")),
+        ("🔎 Chancen vs. Risiken", blocks.get("CHANCES_RISKS", "")),
+        ("🚨 Das Minenfeld", blocks.get("MINEFIELD", "")),
+        ("🧩 Maximale Essenz", blocks.get("ESSENZ", "")),
+        ("✅ Praxis-Checkliste", blocks.get("CHECKLIST", "")),
+        ("🌐 Quellen", blocks.get("SOURCES", "")),
+    ]
+    story.append(Paragraph(esc("Inhaltsübersicht"), styles["Heading3"]))
     story.append(Spacer(1, 6))
-    story.append(ListFlowable([ListItem(Paragraph(esc(n), body)) for n in toc_items],
-                              bulletType="bullet", leftIndent=16))
+    story.append(ListFlowable(
+        [ListItem(Paragraph(esc(t[0]), body)) for t in toc if t[1].strip()],
+        bulletType="bullet",
+        leftIndent=16
+    ))
     story.append(PageBreak())
 
-    def render_block(block_title: str, content: str, is_warning: bool = False):
-        story.append(Paragraph(esc(block_title), h2))
-        lines = [ln.rstrip() for ln in content.splitlines()]
+    def render_block(title: str, content: str, is_warning: bool = False):
+        story.append(Paragraph(esc(title), h2))
+        lines = [ln.rstrip() for ln in (content or "").splitlines()]
         bullets = []
-        paragraph_buf = []
+        paras = []
 
         def flush_para():
-            nonlocal paragraph_buf
-            if paragraph_buf:
-                p = " ".join([p.strip() for p in paragraph_buf]).strip()
+            nonlocal paras
+            if paras:
+                p = " ".join([p.strip() for p in paras]).strip()
                 if p:
                     story.append(Paragraph(esc(p), warn if is_warning else body))
-                paragraph_buf = []
+                paras = []
 
         def flush_bullets():
             nonlocal bullets
             if bullets:
-                lf = ListFlowable([ListItem(Paragraph(esc(b), body)) for b in bullets],
-                                  bulletType="bullet", leftIndent=16)
-                story.append(lf)
+                story.append(ListFlowable(
+                    [ListItem(Paragraph(esc(b), body)) for b in bullets],
+                    bulletType="bullet",
+                    leftIndent=16
+                ))
                 story.append(Spacer(1, 6))
                 bullets = []
 
@@ -510,6 +496,10 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
                 flush_para()
                 flush_bullets()
                 continue
+            if s.startswith("- [ ]"):
+                flush_para()
+                bullets.append("☐ " + s[5:].strip())
+                continue
             if s.startswith("- "):
                 flush_para()
                 bullets.append(s[2:].strip())
@@ -518,26 +508,27 @@ def build_pdf_bytes_pretty(topic: str, md_text: str) -> bytes:
                 flush_para()
                 bullets.append(s)
                 continue
-            paragraph_buf.append(s)
+            paras.append(s)
 
         flush_para()
         flush_bullets()
         story.append(Spacer(1, 6))
 
-    for name, content in sections:
-        if not content:
-            continue
-        render_block(name, content, is_warning=(name == "🚨 Das Minenfeld"))
+    render_block("🧭 Wie es sich wirklich anfühlt", blocks.get("BRIEFING", ""))
+    render_block("🔎 Chancen vs. Risiken", blocks.get("CHANCES_RISKS", ""))
+    render_block("🚨 Das Minenfeld", blocks.get("MINEFIELD", ""), is_warning=True)
+    render_block("🧩 Maximale Essenz", blocks.get("ESSENZ", ""))
+    render_block("✅ Praxis-Checkliste", blocks.get("CHECKLIST", ""))
+    render_block("🌐 Quellen", blocks.get("SOURCES", ""))
 
     story.append(Spacer(1, 8))
     story.append(Paragraph("— Ende des Dossiers —", small))
-
     doc.build(story)
     return buf.getvalue()
 
 
 # =========================
-# Global CSS + Sidebar
+# Global CSS + Sidebar UI
 # =========================
 apply_global_css(sidebar_px_desktop=460)
 
@@ -547,8 +538,8 @@ with st.sidebar:
     st.markdown(
         """
 **API-Key (kurz & simpel):**  
-Ein **Zugangscode**, damit RealityBot die Analyse bei Gemini anfragen darf.  
-Er gehört zu **deinem** Google-Konto (Limits/Kosten laufen darüber).  
+Ein **Zugangscode**, damit RealityBot bei Gemini deine Analyse anfragen darf.  
+Er hängt an **deinem** Google-Konto (Limits/Kosten laufen darüber).  
 👉 **Nicht teilen** – du kannst ihn jederzeit löschen.
 """
     )
@@ -588,56 +579,75 @@ Er gehört zu **deinem** Google-Konto (Limits/Kosten laufen darüber).
 
     st.markdown("---")
     with st.expander("🧰 Pro-Tools (optional)", expanded=False):
+        # Standard etwas "schneller", damit Mobile nicht ewig lädt
         preset = st.radio("Deep-Dive Profil", ["Standard", "Deep", "Ultra-Deep", "Manuell"], index=0)
 
         if preset == "Standard":
             per_side, retries, backoff = 5, 3, 1.4
-            fetch_enabled, fetch_top_n, excerpt_chars = True, 4, 900
+            fetch_enabled, fetch_top_n, excerpt_chars = True, 2, 650
         elif preset == "Deep":
             per_side, retries, backoff = 8, 4, 1.6
-            fetch_enabled, fetch_top_n, excerpt_chars = True, 6, 1200
+            fetch_enabled, fetch_top_n, excerpt_chars = True, 5, 1100
         elif preset == "Ultra-Deep":
             per_side, retries, backoff = 10, 5, 1.8
-            fetch_enabled, fetch_top_n, excerpt_chars = True, 8, 1600
+            fetch_enabled, fetch_top_n, excerpt_chars = True, 7, 1500
         else:
             per_side = st.slider("Treffer je Seite", 3, 10, 5, 1)
             retries = st.slider("Stabilität (Retries)", 1, 5, 3, 1)
             backoff = st.slider("Backoff", 1.0, 3.0, 1.4, 0.1)
             fetch_enabled = st.checkbox("Mehr Kontext (Seiten-Auszüge)", value=True)
-            fetch_top_n = st.slider("Top-Links fetchen", 0, 8, 4, 1)
-            excerpt_chars = st.slider("Auszug-Länge", 300, 2000, 900, 100)
+            fetch_top_n = st.slider("Top-Links fetchen", 0, 8, 2, 1)
+            excerpt_chars = st.slider("Auszug-Länge", 300, 2000, 650, 100)
 
         gemini_model = st.selectbox(
             "Gemini Modell",
             ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"],
             index=0
         )
+
         demo_mode = st.checkbox("Demo ohne KI", value=False)
 
+
+# Defaults if expander never opened
 if "gemini_model" not in locals():
     gemini_model = "gemini-2.5-flash"
+if "demo_mode" not in locals():
     demo_mode = False
 if "per_side" not in locals():
     per_side, retries, backoff = 5, 3, 1.4
-    fetch_enabled, fetch_top_n, excerpt_chars = True, 4, 900
+    fetch_enabled, fetch_top_n, excerpt_chars = True, 2, 650
 
 
 # =========================
-# Lock / Unlock main + blur only on desktop
+# Unlock logic
 # =========================
 key_ok = (st.session_state.get("key_status") is not None and st.session_state["key_status"][0] == "ok")
 unlocked = demo_mode or key_ok
 
-prev_unlock = st.session_state.get("rb_prev_unlock", False)
-if unlocked and not prev_unlock:
-    st.session_state["rb_prev_unlock"] = True
-    try:
-        st.toast("🔓 Freigeschaltet – bereit für den Deep-Dive!", icon="✅")
-    except Exception:
-        st.success("🔓 Freigeschaltet – bereit für den Deep-Dive!")
-elif not unlocked:
-    st.session_state["rb_prev_unlock"] = False
+# === Mobile: Sidebar automatisch "schließen" (via CSS ausblenden), sobald freigeschaltet ===
+if "rb_hide_sidebar_mobile" not in st.session_state:
+    st.session_state["rb_hide_sidebar_mobile"] = False
 
+# Sobald unlocked zum ersten Mal True ist, Sidebar auf Mobile automatisch ausblenden
+if unlocked and not st.session_state["rb_hide_sidebar_mobile"]:
+    st.session_state["rb_hide_sidebar_mobile"] = True
+    st.rerun()
+
+# CSS hide (Mobile only)
+if st.session_state.get("rb_hide_sidebar_mobile", False):
+    st.markdown(
+        """
+<style>
+@media (pointer: coarse), (hover: none) {
+  section[data-testid="stSidebar"] { display: none !important; }
+  div[data-testid="stAppViewContainer"] { margin-left: 0 !important; }
+}
+</style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Blur on desktop only while locked
 apply_blur_main_desktop_only(locked=not unlocked)
 
 
@@ -645,13 +655,6 @@ apply_blur_main_desktop_only(locked=not unlocked)
 # Main UI
 # =========================
 st.title("🧠 RealityBot: Deep-Dive")
-
-# Mobile default: Tabs ON (weil Handy-Tests)
-st.session_state["mobile_layout"] = st.checkbox(
-    "📱 Mobile-Ansicht (Tabs statt langer Seite)",
-    value=st.session_state.get("mobile_layout", True),
-    help="Auf dem Handy sind Tabs oft angenehmer als eine sehr lange Scroll-Seite.",
-)
 
 st.markdown(
     """
@@ -668,10 +671,29 @@ Du bekommst:
 """
 )
 
+# If locked
 if not unlocked:
     st.error("🔒 Erst aktivieren: Tippe oben links auf **☰**, öffne die Sidebar und füge deinen **Gemini API-Key** ein.")
     st.caption(CREDIT_LINE)
     st.stop()
+
+# Mobile helper: reopen settings (unhide sidebar)
+with st.expander("⚙️ Einstellungen (Key/Pro-Tools)", expanded=False):
+    st.write("Wenn du den Key ändern oder die Pro-Tools nutzen willst:")
+    if st.button("Sidebar wieder anzeigen", use_container_width=True):
+        st.session_state["rb_hide_sidebar_mobile"] = False
+        st.rerun()
+    st.info("Auf dem Handy dann links oben **☰** tippen, um die Sidebar zu öffnen.")
+
+# Default mobile layout ON, without forcing users to understand it
+if "mobile_layout" not in st.session_state:
+    st.session_state["mobile_layout"] = True
+
+st.session_state["mobile_layout"] = st.checkbox(
+    "📱 Mobile-Ansicht (Tabs statt langer Seite)",
+    value=st.session_state.get("mobile_layout", True),
+    help="Auf dem Handy sind Tabs oft angenehmer als eine sehr lange Scroll-Seite.",
+)
 
 
 # =========================
@@ -703,9 +725,10 @@ def run_analysis(topic_value: str) -> None:
 
     with st.status("🛰️ RealityBot arbeitet im Hintergrund…", expanded=False) as status:
         status.update(label="🛰️ Sammle Erfahrungswissen…", state="running")
+
         try:
             neg_raw = safe_ddgs_search(neg_query, max_results=per_side, retries=retries, backoff=backoff)
-            time.sleep(0.5)
+            time.sleep(0.35)
             pos_raw = safe_ddgs_search(pos_query, max_results=per_side, retries=retries, backoff=backoff)
         except Exception as e:
             status.update(label="⚠️ Recherche konnte nicht abgeschlossen werden", state="error")
@@ -731,7 +754,7 @@ def run_analysis(topic_value: str) -> None:
         try:
             report = call_gemini(prompt, api_key.strip(), gemini_model)
         except Exception as e:
-            report = f"### ⚠️ KI-Analyse fehlgeschlagen\nGrund: {str(e)}"
+            report = f"[[RB:BRIEFING]]\n⚠️ KI-Analyse fehlgeschlagen: {str(e)}\n[[/RB:BRIEFING]]"
 
         report = strip_internal_markers(report)
 
@@ -753,71 +776,81 @@ if submitted:
 
 
 # =========================
-# Output rendering (Desktop = long view, Mobile = tabs)
+# Output rendering
 # =========================
-def render_section(md: str, header: str) -> str:
-    return extract_section(md, header) or ""
-
-
 if "final_report" in st.session_state:
     report_md = st.session_state.final_report
     topic_value = st.session_state.get("topic_value", "RealityBot Dossier")
     raw_sources_block = st.session_state.get("raw_sources_block", "")
 
+    blocks = {
+        "BRIEFING": extract_rb_block(report_md, "BRIEFING"),
+        "CHANCES_RISKS": extract_rb_block(report_md, "CHANCES_RISKS"),
+        "MINEFIELD": extract_rb_block(report_md, "MINEFIELD"),
+        "ESSENZ": extract_rb_block(report_md, "ESSENZ"),
+        "CHECKLIST": extract_rb_block(report_md, "CHECKLIST"),
+        "SOURCES": extract_rb_block(report_md, "SOURCES"),
+    }
+
+    # Fallback: wenn Marker fehlen (z.B. KI weicht ab), zeige komplett
+    marker_missing = all(not v.strip() for v in blocks.values())
+
     st.divider()
 
-    briefing = render_section(report_md, "## 🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)")
-    chances = render_section(report_md, "## 🔎 Chancen vs. Risiken (5 + 5)")
-    mine = render_section(report_md, "## 🚨 Das Minenfeld")
-    essenz = render_section(report_md, "## 🧩 Maximale Essenz")
-    checklist = render_section(report_md, "## ✅ Praxis-Checkliste (dynamisch)")
-    sources_ki = render_section(report_md, "## 🌐 Quellen")
+    if marker_missing:
+        st.warning("Hinweis: Die KI hat das Ausgabe-Format leicht verändert. Ich zeige deshalb das komplette Dossier.")
+        st.markdown(report_md)
+    else:
+        if st.session_state.get("mobile_layout", True):
+            tabs = st.tabs(["🧭 Briefing", "🔎 5+5", "🚨 Minenfeld", "🧩 Essenz", "✅ Checkliste", "🌐 Quellen"])
+            with tabs[0]:
+                st.markdown(blocks["BRIEFING"] or "_(nicht gefunden)_")
+            with tabs[1]:
+                st.markdown(blocks["CHANCES_RISKS"] or "_(nicht gefunden)_")
+            with tabs[2]:
+                if blocks["MINEFIELD"]:
+                    st.error(blocks["MINEFIELD"])
+                else:
+                    st.markdown("_(nicht gefunden)_")
+            with tabs[3]:
+                st.markdown(blocks["ESSENZ"] or "_(nicht gefunden)_")
+            with tabs[4]:
+                st.markdown(blocks["CHECKLIST"] or "_(nicht gefunden)_")
+            with tabs[5]:
+                st.markdown(blocks["SOURCES"] or "_(nicht gefunden)_")
+                with st.expander("🔎 Quellenprüfung (Rohdaten) – gesammelt"):
+                    st.markdown(raw_sources_block)
+        else:
+            st.markdown("## 🧭 Wie es sich wirklich anfühlt")
+            st.markdown(blocks["BRIEFING"] or "_(nicht gefunden)_")
 
-    if st.session_state.get("mobile_layout", True):
-        tabs = st.tabs(["🧭 Briefing", "🔎 5+5", "🚨 Minenfeld", "🧩 Essenz", "✅ Checkliste", "🌐 Quellen"])
-        with tabs[0]:
-            st.markdown(briefing or "_(nicht gefunden)_")
-        with tabs[1]:
-            st.markdown(chances or "_(nicht gefunden)_")
-        with tabs[2]:
-            if mine:
-                st.error(mine)
+            st.markdown("## 🔎 Chancen vs. Risiken (5 + 5)")
+            st.markdown(blocks["CHANCES_RISKS"] or "_(nicht gefunden)_")
+
+            st.markdown("## 🚨 Das Minenfeld")
+            if blocks["MINEFIELD"]:
+                st.error(blocks["MINEFIELD"])
             else:
                 st.markdown("_(nicht gefunden)_")
-        with tabs[3]:
-            st.markdown(essenz or "_(nicht gefunden)_")
-        with tabs[4]:
-            st.markdown(checklist or "_(nicht gefunden)_")
-        with tabs[5]:
-            st.markdown(sources_ki or "_(nicht gefunden)_")
+
+            st.markdown("## 🧩 Maximale Essenz")
+            st.markdown(blocks["ESSENZ"] or "_(nicht gefunden)_")
+
+            st.markdown("## ✅ Praxis-Checkliste")
+            st.markdown(blocks["CHECKLIST"] or "_(nicht gefunden)_")
+
+            st.divider()
+            st.markdown("## 🌐 Quellen")
+            st.markdown(blocks["SOURCES"] or "_(nicht gefunden)_")
             with st.expander("🔎 Quellenprüfung (Rohdaten) – gesammelt"):
                 st.markdown(raw_sources_block)
-    else:
-        if briefing:
-            st.markdown("## 🧭 Wie es sich wirklich anfühlt (Erfahrungs-Briefing)")
-            st.markdown(briefing)
-        if chances:
-            st.markdown("## 🔎 Chancen vs. Risiken (5 + 5)")
-            st.markdown(chances)
-        if mine:
-            st.markdown("## 🚨 Das Minenfeld")
-            st.error(mine)
-        if essenz:
-            st.markdown("## 🧩 Maximale Essenz")
-            st.markdown(essenz)
-        if checklist:
-            st.markdown("## ✅ Praxis-Checkliste")
-            st.markdown(checklist)
 
-        st.divider()
-        st.markdown("## 🌐 Quellen")
-        if sources_ki:
-            st.markdown(sources_ki)
+    export_txt = (
+        f"RealityBot – Deep-Dive Dossier\n\n"
+        f"THEMA:\n{topic_value}\n\n"
+        f"RAW_REPORT:\n{report_md}\n"
+    )
 
-        with st.expander("🔎 Quellenprüfung (Rohdaten) – gesammelt"):
-            st.markdown(raw_sources_block)
-
-    export_txt = f"RealityBot – Deep-Dive Dossier\n\nTHEMA:\n{topic_value}\n\nREPORT:\n{report_md}\n"
     st.download_button(
         "📄 Dossier als .txt speichern",
         data=export_txt.encode("utf-8"),
@@ -827,7 +860,7 @@ if "final_report" in st.session_state:
     )
 
     try:
-        pdf_bytes = build_pdf_bytes_pretty(topic_value, report_md)
+        pdf_bytes = build_pdf_bytes_pretty(topic_value, blocks if not marker_missing else {"BRIEFING": report_md})
         st.download_button(
             "🧾 Dossier als PDF speichern",
             data=pdf_bytes,
